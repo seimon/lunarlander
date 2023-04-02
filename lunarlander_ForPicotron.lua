@@ -1,6 +1,11 @@
 dev=false
-ver="0.13" -- 2023/04/01
+ver="0.14" -- 2023/04/02
 --[[
+v0.14 (2023/04/02)
+- 지형을 거대한 원형으로 그림
+- 지형 확대축소할 때 LOD 처리
+- 지형 데이타 조금 더 추가
+
 v0.13 (2023/04/01)
 - 지형 화면에 꽉 채워서 그리기
 
@@ -24,45 +29,7 @@ sw,sh=480,270
 cx,cy=sw/2,sh/2
 log_txt={}
 
--- <Asteroids Font(7x9, 5x7 Pixel)> --------------------
-fnt_data_79=[[
-00070000070700070007000070007770000077777000070000000700007000000000000000000000000000000000000000000000077777770007000777777700
-00070000070700070007077777777070007070007000070000007000000700070000070007000000000000000000000000000000770000070007000000000700
-00070000070700777777770000007770070070070000070000070000000070007000700007000000000000000000000000000007070000070007000000000700
-00070000000000070007070000000000700070700000000000070000000070000707000007000000000000000000000000000070070000070007000000000700
-00070000000000070007077777770007000007000700000000070000000070077777777777777000000077777770000000000700070000070007000777777700
-00070000000000070007000000070070000070707000000000070000000070000707000007000000000000000000000000007000070000070007000700000000
-00070000000000777777700000070700777700070000000000070000000070007000700007000000070000000000000000070000070000070007000700000000
-00000000000000070007077777777000707700707000000000007000000700070000070007000000700000000000000000700000070000070007000700000000
-00070000000000070007000070000000777777000700000000000700007000000000000000000007000000000000007000000000077777770007000777777700
-77777777000007777777777777777777777777777777777770000000000000000000700000000070000077777770077700000700077777007777777777770000
-00000077000007700000070000000000007700000770000070007000000700000007000000000007000070000070700070007070070000707000000700007000
-00000077000007700000070000000000007700000770000070007000000700000070000000000000700070000077000007070007070000077000000700000700
-00000077000007700000070000000000007700000770000070000000000000000700007777777000070000000707077707700000770000707000000700000700
-77777777777777777777777777770000007777777777777770000000000000007000000000000000007000007007070707700000777777007000000700000700
-00000070000007000000770000070000007700000700000070000000000000000700007777777000070000070007077777777777770000707000000700000700
-00000070000007000000770000070000007700000700000070007000000700000070000000000000700000070007000000700000770000077000000700000700
-00000070000007000000770000070000007700000700000070007000000700000007000000000007000000000000700000700000770000707000000700007000
-77777770000007777777777777770000007777777700000070000000007000000000700000000070000000070000077777700000777777007777777777770000
-77777777777777777777770000077777777000000770000077000000700000770000077777777777777777777777777777777777777777777000007700000700
-70000007000000700000770000070007000000000770000707000000770007777000077000007700000770000077000007700000000070007000007700000700
-70000007000000700000770000070007000000000770007007000000707070770700077000007700000770000077000007700000000070007000007070007000
-70000007000000700000070000070007000000000770070007000000700700770700077000007700000770000077000007700000000070007000007070007000
-77777007777700700000077777770007000000000777700007000000700000770070077000007777777770000077777777777777700070007000007070007000
-70000007000000700777770000070007000700000770070007000000700000770007077000007700000070070707007000000000700070007000007007070000
-70000007000000700000770000070007000070000770007007000000700000770007077000007700000070007007000700000000700070007000007007070000
-70000007000000700000770000070007000007000770000707000000700000770000777000007700000070070707000070000000700070007000007000700000
-77777777000000777777770000077777777000777770000077777777700000770000077777777700000077700077000007777777700070007777777000700000
-70000077000007700000777777770077700000000000777000007000000000000700000007770000700007770000000000007770000000000000000000000000
-70000070700070070007000000700070000700000000007000070700000000000070000007000000700000070000000000070007000000000000000000000000
-70000070700070007070000007000070000070000000007000700070000000000007000007000000700000070000700000700000700000000000000000000000
-70000070070700000700000007000070000007000000007000000000000000000000000070000000700000007007070000707770700000000000000000000000
-70000070007000000700000070000070000000700000007000000000000000000000000700000000000000000700007000707000700000000000000000000000
-70070070070700000700000700000070000000070000007000000000000000000000000070000000700000007000000707707770700000000000000000000000
-70707070700070000700000700000070000000007000007000000000000000000000000007000000700000070000000070700000700000000000000000000000
-77000770700070000700007000000070000000000700007000000000000000000000000007000000700000070000000000070007000000000000000000000000
-70000077000007000700077777770077700000000000777000000000777777700000000007770000700007770000000000007770000000000000000000000000
-]]
+-- <Asteroids Font(5x7 Pixel)> --------------------
 fnt_data_57=[[
 00700070700000000700000007777000700000700700000000000000000000000000000000077777007007777777777700077777777777777777777777777000
 00700070700707077777700077007000700007000070070007007000000000000000000000770007007000000700007700077000070000000077000770007000
@@ -86,7 +53,6 @@ fnt_data_57=[[
 00007007007000700700770770707000700700000700000007000700000000000000000070000700007000000070007000000000000000000000000000000000
 77777007007777700700700077000700700777770777000000077700000077777000000077000700077000000007770000000000000000000000000000000000
 ]]
-fnt79=userdata("[gfx]8124"..fnt_data_79) -- 0x81*0x24 크기의 이미지에 68글자+(C)문자(총 69글자)를 그려놨음
 fnt57=userdata("[gfx]8115"..fnt_data_57) -- 0x81*0x15 크기의 이미지에...
 
 function is_inside(v,min,max) return v>=min and v<=max end
@@ -99,12 +65,37 @@ function convert_ord_to_id(t) -- 글자에서 ord 값을 뽑아 스프라이트 
 	else a=-1 end -- 나머지는 공백 문자
 	return a
 end
-
-function print79(t,x,y,c,align,big_size,draw_ratio,with_box)
+--[[ function print79(t,x,y,c,align,big_size,draw_ratio,with_box)
 	local id
 	local gap=2
 	local data,w,h,n=fnt57,5,7,25 -- 데이터(spr),글자하나의 가로,세로,이미지 한 줄에 있는 글자 수
-	if(big_size) data,w,h,n=fnt79,7,9,18
+	-- if(big_size) data,w,h,n=fnt79,7,9,18
+	if(draw_ratio) t=sub(t,1,flr(#t*clamp(draw_ratio,0,1)))..((draw_ratio>0 and draw_ratio<1) and "_" or "")
+	
+	-- 글자 정렬
+	local align=align and align or 0 -- 정렬 0 왼쪽부터, 0.5 중앙, 1 오른쪽부터
+	local full_w=#t*w+(#t-1)*gap-1
+	if align==0.5 then x=x-full_w/2 elseif align==1 then x=x-full_w end
+
+	-- 테두리 박스
+	if(with_box and #t>0) draw_shape(s_box,x-5,y+3,cc,0,false,1,{x=(full_w+10)/10,y=1.6})
+
+	pal(7,c)
+	for i=1,#t do
+		id=convert_ord_to_id(sub(t,i,i))
+		if id>=0 then
+			local tx,ty=id%n*w,id\n*h
+			sspr(data,tx,ty,w,h,x,y)
+		end
+		x+=w+gap
+	end
+	pal()
+end ]]
+-- 5x7 폰트 찍기
+function print57(t,x,y,c,align,draw_ratio,with_box)
+	local id
+	local gap=2
+	local data,w,h,n=fnt57,5,7,25 -- 데이터(spr),글자하나의 가로,세로,이미지 한 줄에 있는 글자 수
 	if(draw_ratio) t=sub(t,1,flr(#t*clamp(draw_ratio,0,1)))..((draw_ratio>0 and draw_ratio<1) and "_" or "")
 	
 	-- 글자 정렬
@@ -126,6 +117,7 @@ function print79(t,x,y,c,align,big_size,draw_ratio,with_box)
 	end
 	pal()
 end
+
 
 
 
@@ -497,9 +489,9 @@ function space:_draw()
 
 		elseif v.type=="bonus" then
 			-- local x=min(3,-16-sin((120-v.age)/240)*20)
-			-- print79("bonus!",x,16,cc,0)
 			local dr=clamp((1-abs(1-v.age/90))*1.5,0,1) -- 0->1->delay->0
-			print79("bonus!!!",3,16,cc,0,false,dr)
+			-- print79("bonus!!!",3,16,cc,0,false,dr)
+			print57("bonus!!!",3,16,cc,0,dr)
 			if(v.age>180) del(self.particles,v)
 
 		elseif v.type=="debug_line" then
@@ -1049,9 +1041,12 @@ function title:_draw()
 			menu_str[i]=t1..self.menu_str[i]..t2
 		end
 		local dr=get_draw_ratio(gg.title_timer,-3,3,240) -- -3->3 / 240frames
-		print79(menu_str[1],sw/2+dx4,sh/2+30+dy4,cc,0.5,false,dr,gg.title_selected_menu==1)
-		print79(menu_str[2],sw/2+dx5,sh/2+50+dy5,cc,0.5,false,dr-0.7,gg.title_selected_menu==2)
-		print79(menu_str[3],sw/2+dx6,sh/2+70+dy6,cc,0.5,false,dr-1.4,gg.title_selected_menu==3 and self.modal_timer<=0)
+		-- print79(menu_str[1],sw/2+dx4,sh/2+30+dy4,cc,0.5,false,dr,gg.title_selected_menu==1)
+		-- print79(menu_str[2],sw/2+dx5,sh/2+50+dy5,cc,0.5,false,dr-0.7,gg.title_selected_menu==2)
+		-- print79(menu_str[3],sw/2+dx6,sh/2+70+dy6,cc,0.5,false,dr-1.4,gg.title_selected_menu==3 and self.modal_timer<=0)
+		print57(menu_str[1],sw/2+dx4,sh/2+30+dy4,cc,0.5,dr,gg.title_selected_menu==1)
+		print57(menu_str[2],sw/2+dx5,sh/2+50+dy5,cc,0.5,dr-0.7,gg.title_selected_menu==2)
+		print57(menu_str[3],sw/2+dx6,sh/2+70+dy6,cc,0.5,dr-1.4,gg.title_selected_menu==3 and self.modal_timer<=0)
 		
 		-- z/x key guide
 		do
@@ -1061,13 +1056,14 @@ function title:_draw()
 		-- bottom text
 		local dy7=sin((t())%5/5)*6
 		local dr=get_draw_ratio(gg.title_timer,-2,1,300) -- -2->1 / 300frames
-		-- print79("z:fire x:shield <>:rotate ^:thrust",sw/2-dx1,sh-26+dy7,cc,0.5,false,dr)
-		print79("(c)1979 atari inc. demaked by @mooon",sw/2-dx1,sh-16+dy7,cc,0.5,false,dr)
-		print79("version "..ver,sw-4,4,cc,1,false,dr)
+		-- print79("(c)1979 atari inc. demaked by @mooon",sw/2-dx1,sh-16+dy7,cc,0.5,false,dr)
+		-- print79("version "..ver,sw-4,4,cc,1,false,dr)
+		print57("(c)1979 atari inc. demaked by @mooon",sw/2-dx1,sh-16+dy7,cc,0.5,dr)
+		print57("version "..ver,sw-4,4,cc,1,dr)
 
 
 		-- draw modal window
-		--[[ if self.modal_timer>0 then
+		if self.modal_timer>0 then
 			local dr=1-get_draw_ratio(self.modal_timer-210,0,1,30)^4 -- 0->1
 			local cx,cy=cx+dy4,cy+dx4
 			local w,h=260+dr*20,40+dr*20
@@ -1080,24 +1076,34 @@ function title:_draw()
 
 			if gg.title_selected_menu==4 then -- z/x key guide
 				local x,y=cx-74,cy-14
-				print79("z",x,y,cc,0,false,1,true)
-				print79("fire",x+16,y,cc)
-				print79("x",x,y+21,cc,0,false,1,true)
-				print79("shield",x+16,y+22,cc)
-				print79("^",x+89,y,cc,0,false,1,true)
-				print79("thrust",x+113,y,cc)
-				print79("<",x+80,y+22,cc,0,false,1,true)
-				print79(">",x+98,y+22,cc,0,false,1,true)
-				print79("rotate",x+113,y+22,cc)
+				-- print79("z",x,y,cc,0,false,1,true)
+				-- print79("fire",x+16,y,cc)
+				-- print79("x",x,y+21,cc,0,false,1,true)
+				-- print79("shield",x+16,y+22,cc)
+				-- print79("^",x+89,y,cc,0,false,1,true)
+				-- print79("thrust",x+113,y,cc)
+				-- print79("<",x+80,y+22,cc,0,false,1,true)
+				-- print79(">",x+98,y+22,cc,0,false,1,true)
+				-- print79("rotate",x+113,y+22,cc)
+				print57("z",x,y,cc,0,1,true)
+				print57("fire",x+16,y,cc)
+				print57("x",x,y+21,cc,0,1,true)
+				print57("shield",x+16,y+22,cc)
+				print57("^",x+89,y,cc,0,1,true)
+				print57("thrust",x+113,y,cc)
+				print57("<",x+80,y+22,cc,0,1,true)
+				print57(">",x+98,y+22,cc,0,1,true)
+				print57("rotate",x+113,y+22,cc)
 			elseif gg.title_selected_menu==3 then -- ufo rush mode
-				print79("sorry, under develpment...",cx,cy-3,cc,0.5,false,dr)
+				-- print79("sorry, under develpment...",cx,cy-3,cc,0.5,false,dr)
+				print57("sorry, under develpment...",cx,cy-3,cc,0.5,dr)
 			end
 			if self.modal_timer==1 then
 				add_break_eff(cx-54,cy,s_demake,3,30,true)
 				add_break_eff(cx+80,cy,s_2023,3,30,true)
 				shake(30,0.3)
 			end
-		end ]]
+		end
 		
 		-- 키 입력
 		if gg.key_wait>0 then
@@ -1157,14 +1163,16 @@ function title:_draw()
 		local dy3=sin(t()%4/4)*6
 		local dx3=sin((t()-0.6)%4/4)*6
 		dr=get_draw_ratio(gg.gameover_timer,-2,2,240) -- -1->1 / 240f
-		print79(self.menu_str[gg.title_selected_menu].." score",sw/2+dx3,y+50+dy3,cc,0.5,false,dr)
+		-- print79(self.menu_str[gg.title_selected_menu].." score",sw/2+dx3,y+50+dy3,cc,0.5,false,dr)
+		print57(self.menu_str[gg.title_selected_menu].." score",sw/2+dx3,y+50+dy3,cc,0.5,dr)
 		print_score(sw/2+dx2+dx3,y+64+dy3*1.3,1.6,8,dr)
 
 		local dy4=sin(t()%5/5)*6
 		local dx4=sin(t()%6/6)*7
 		dr=get_draw_ratio(gg.gameover_timer,-2,1,300) -- -2->1 / 300f
 		local t=(gg.gameover_timer>=300 and t()%1<0.5) and "" or "press z/x key to continue"
-		print79(t,sw/2+dx4,y+120+dy4,cc,0.5,false,dr)
+		-- print79(t,sw/2+dx4,y+120+dy4,cc,0.5,false,dr)
+		print57(t,sw/2+dx4,y+120+dy4,cc,0.5,dr)
 
 		_ship:show(false)
 		_ship.__show=false
@@ -1215,7 +1223,8 @@ function draw_color_table()
 		local x=i%16*size
 		local y=i\16*size
 		rectfill(x,y,x+size,y+size,i)
-		print79(tostr(i),x+2,y+2,value_loop(i-10,0,31))
+		-- print79(tostr(i),x+2,y+2,value_loop(i-10,0,31))
+		print57(tostr(i),x+2,y+2,value_loop(i-10,0,31))
 	end
 end
 
@@ -1561,12 +1570,30 @@ add(planet_data,{0,16,1,-80,6,-80,7,0,8,3,9,29,10,29})
 add(planet_data,{0,29,1,34,2,76,4,80,5,90,6,100,8,95,9,110,10,200})
 add(planet_data,{0,200,1,205,2,280,3,275,5,230,7,226,8,200,9,200,10,300})
 add(planet_data,{0,300,8,300,9,270,10,260})
-add(planet_data,{0,260,6,260,7,220,8,216,9,10,10,0})
+add(planet_data,{0,260,6,260,7,220,8,216,9,10,10,-20})
+add(planet_data,{0,-20,2,-20,3,80,7,80,8,30,9,27,10,0})
+add(planet_data,{0,0,7,0,8,10,10,10})
+add(planet_data,{0,10,10,10})
+add(planet_data,{0,10,9,10,10,-20})
+add(planet_data,{0,-20,10,-20})
+add(planet_data,{0,-20,1,40,4,40,5,20,10,20})
+add(planet_data,{0,20,1,-40,2,-44,3,-120,4,-130,6,-125,7,-120,8,-50,9,-40,10,40})
+add(planet_data,{0,40,7,40,8,0,10,0})
+-- 행성을 원으로 표현하기 위한 y 보정값
+function get_planet_diff_y(x)
+	return abs(sw/2-x)^2*0.0003/pp.scale
+end
 -- 지형의 한 구역 그리기
 function draw_planet_part(arr,x,y,w,h,c)
 	local x1,y1=flr(x+arr[1]*w/10+0.5),flr(y+arr[2]*h/10+0.5)
-	for i=3,#arr-1,2 do
+	y1+=get_planet_diff_y(x1)
+
+	-- 그리는 폭이 좁으면 시작점-끝점만 그림(LOD)
+	local i1=(w<6) and #arr-3 or 3
+
+	for i=i1,#arr-1,2 do
 		local x2,y2=flr(x+arr[i]*w/10+0.5),flr(y+arr[i+1]*h/10+0.5)
+		y2+=get_planet_diff_y(x2)
 
 		-- 검은 세로줄 그리기(별 가림막)
 		for k=x1+1,x2 do
@@ -1580,25 +1607,38 @@ function draw_planet_part(arr,x,y,w,h,c)
 end
 -- 지형 그리기
 function draw_planet(base_x,base_y)
-	-- local x,y,w,h=0,base_y,planet.scale_x*10,planet.scale_y*10 -- w,h는 10이 100%
 	local x,y,w,h=base_x,base_y,pp.scale*10,pp.scale -- w,h는 10이 100%
+	if(h<1) h=h*h
 	
-	local n1=-flr(x/(pp.scale*10))
-	local n2=flr((sw-x)/(pp.scale*10))+1
-	-- for i=1,#planet_data*3 do
-	for i=n1,n2 do
-		draw_planet_part(planet_data[i%#planet_data+1],x+(i-1)*w,y,w,h,cc)
-		-- draw_planet_part(planet_data[i%#planet_data+1],x+(i-1)*w,y,w,h,27+i%5) -- 각 구역을 다른 색으로
+	-- 스케일이 작으면 그냥 큰 원을 그림
+	if pp.scale<0.3 then
+		local r=1800*pp.scale
+		circfill(sw/2,y+r,r,32)
+		circ(sw/2,y+r,r,cc)
+	else
+		-- planet_data를 반복해서 지형 그림(화면 전체에 꽉 차게)
+		local n1=-flr(x/(pp.scale*10))-1
+		local n2=flr((sw-x)/(pp.scale*10))
+		for i=n1,n2 do
+			-- local cc=27+i%5 -- 각 구역을 다른 색으로(TEST)
+			draw_planet_part(planet_data[i%#planet_data+1],x+i*w,y,w,h,cc)
+		end
 	end
-
 
 	-- 기준선 그리기(해발고도)
 	if f%3==0 then
 		fillp(clsp2[f%#clsp2+1])
-		line(0,pp.base_y,sw,pp.base_y,cc)
-		line(x,0,x,sh,cc)
+		-- line(0,pp.base_y,sw,pp.base_y,cc) -- 수평
+		line(x,0,x,sh,cc) -- 수직
+
+		-- 대형 원을 그려보자(달 전체)
+		local r=1800*pp.scale
+		circ(sw/2,y+r,r,cc)
+
 		fillp()
 	end
+
+	
 end
 
 
@@ -1685,9 +1725,12 @@ function _update()
 	-- 좌우 키로 지형 스케일xy
 	-- if btn(0) then planet.scale_x+=0.05 planet.scale_y+=0.004
 	-- elseif btn(1) then planet.scale_x-=0.05 planet.scale_y-=0.004 end
+
 	-- 상하 키로 지형 스케일
-	if btn(2) then pp.scale+=0.05
-	elseif btn(3) then pp.scale=max(0.2,pp.scale-0.05) end
+	-- if btn(2) then pp.scale+=0.02
+	-- elseif btn(3) then pp.scale=max(0.25,pp.scale-0.02) end
+	if btn(2) then pp.scale*=1.03
+	elseif btn(3) then pp.scale=max(0.01,pp.scale*0.97) end
 
 	-- 상하 키로 지형 고도
 	-- if btn(2) then pp.base_y-=2
@@ -1743,7 +1786,7 @@ function _draw()
 		t="shield "..t.."%"
 		local w=_ship.shield_timer/_ship.shield_timer_max*74
 		if(not _ship.shield_enable and f%30<15) t="" w=0
-		print79(t,sw-4,hud_top,cc,1) -- shield text
+		print57(t,sw-4,hud_top,cc,1) -- shield text
 	end
 
 	-- shake effect
@@ -1761,9 +1804,9 @@ function _draw()
 	end
 
 	if dev then
-		print79("ufo born:"..gg.ufo_born,3,60,cc,0)
-		print79("speed:"..gg.spd_multiplier,3,70,cc,0)
-		print79("bullet:".._ship.bullet_remain,3,80,cc,0)
+		print57("ufo born:"..gg.ufo_born,3,60,cc,0)
+		print57("speed:"..gg.spd_multiplier,3,70,cc,0)
+		print57("bullet:".._ship.bullet_remain,3,80,cc,0)
 	end
 
 	draw_cross_pattern()
