@@ -4,8 +4,8 @@
 -- ╚══════════════════════════════════╝
 
 -- 버전 정보
-VERSION    = "v0.19.0"
-BUILD_TIME = "2026-06-18 (build 38)"
+VERSION    = "v0.22.0"
+BUILD_TIME = "2026-06-18 (build 42)"
 
 -- ─── 상수 ─────────────────────────────────────────────────────
 W         = 480
@@ -29,7 +29,18 @@ INTRO_FRAMES = 60        -- 분리까지 걸리는 시간(약 1초 @60fps)
 STAR_ZOOM_K  = 0.35      -- 별이 줌에 반응하는 비율(지형보다 약하게)
 
 -- 착륙 채점 세부 항목 (UI 표시용)
-scoring = {base=0, mult=1, foot="none", ang_b=0, spd_b=0, ctr_b=0, total=0}
+scoring = {base=0, mult=1, foot="none", ang_b=0, spd_b=0, ctr_b=0, fuel_b=0, diff_b=0, total=0}
+
+-- 난이도: 0=EASY(연료무제한), 1=NORMAL, 2=HARD(연료50%)
+DIFFICULTY_NAMES = {"EASY", "NORMAL", "HARD"}
+difficulty = 1   -- 기본 NORMAL (인덱스 0~2)
+
+-- 난이도에 따른 시작 연료 반환 (EASY는 무제한 표식으로 -1)
+function start_fuel()
+  if difficulty == 0 then return -1            -- 무제한
+  elseif difficulty == 2 then return FUEL_MAX*0.5  -- HARD 50%
+  else return FUEL_MAX end                     -- NORMAL 100%
+end
 
 -- 게임 모드 플래그
 DEBUG_MODE = false
@@ -423,8 +434,9 @@ end
 function new_lander()
   local sx=WORLD_W/2
   local gy=terrain_y_at(sx)
+  local f0 = start_fuel()
   return {x=sx, y=gy-450, vx=(math.random()-0.5)*0.7,
-          vy=0.1, ang=0, fuel=FUEL_MAX, alive=true,
+          vy=0.1, ang=0, fuel=f0, fuel0=f0, alive=true,
           settling=false, settle_t=0, landed_on_pad=false, pad_mult=1}
 end
 
@@ -1022,12 +1034,87 @@ function draw_pads()
   end
 end
 
+-- ─── 말풍선 ───────────────────────────────────────────────────
+-- 화자의 화면 좌표(spx, spy)를 가리키는 말풍선을 그린다.
+--   text   : 출력할 문자열
+--   spx,spy: 화자의 화면 좌표 (이 점을 삼각형 꼬리가 가리킴)
+--   문자-사각형 여백 3px, 검정 사각형 + 흰 1px 테두리.
+--   기본은 화자 위쪽. 위 공간이 부족하면 화자 아래쪽으로.
+--   삼각형은 화자 x를 따라 좌우로 움직이고, 말풍선 끝에 가까우면
+--   말풍선 전체가 좌우로 밀려 삼각형이 모서리에 박히지 않게 한다.
+PAD_TEXT = 5        -- 글자와 사각형 사이 여백 (3→5)
+SPEAKER_OFFSET = 16 -- 화자 중심에서 말풍선 꼬리까지 고정 거리(착륙선 안 가리게)
+function draw_speech_bubble(text, spx, spy)
+  -- 가변폭 폰트: 화면 밖에 한 번 찍어 실제 픽셀 폭을 잰다
+  local tw = print(text, 0, -1000)
+  local th = 6                       -- 글자 높이(고정)
+  local bw = tw + PAD_TEXT*2          -- 말풍선 폭
+  local bh = th + PAD_TEXT*2          -- 말풍선 높이
+  local tri_h = 4                     -- 삼각형 높이
+
+  -- 화자 중심에서 위/아래로 SPEAKER_OFFSET 떨어진 지점을 삼각형이 가리킴.
+  -- 기본은 위쪽. 위에 두면 말풍선 윗변이 화면 위로 넘칠 땐 아래쪽으로.
+  local tip_y_above = spy - SPEAKER_OFFSET   -- 위로 둘 때 삼각형 꼭짓점
+  local by_above    = tip_y_above - tri_h - bh
+  local point_up, by, tip_y
+  if by_above < 2 then
+    -- 아래쪽
+    point_up = true
+    tip_y = spy + SPEAKER_OFFSET
+    by    = tip_y + tri_h
+  else
+    point_up = false
+    tip_y = tip_y_above
+    by    = by_above
+  end
+
+  -- 말풍선 x: 기본은 화자 중심. 화면 안으로 클램프
+  local bx = math.floor(spx - bw/2)
+  bx = clamp(bx, 2, W - bw - 2)
+
+  -- 삼각형 꼭짓점 x가 말풍선 좌우 끝(min_edge)에 너무 가까우면 말풍선을 밀어줌
+  local min_edge = 5
+  if spx < bx + min_edge then
+    bx = clamp(math.floor(spx - min_edge), 2, W - bw - 2)
+  elseif spx > bx + bw - min_edge then
+    bx = clamp(math.floor(spx - bw + min_edge), 2, W - bw - 2)
+  end
+
+  -- 사각형 (검정 채움 + 흰 테두리)
+  rectfill(bx, by, bx+bw, by+bh, BG)
+  rect(bx, by, bx+bw, by+bh, FG)
+
+  -- 삼각형 꼬리 (검정 채움 + 흰 테두리). 꼭짓점은 화자 쪽(tip_y).
+  local tx = clamp(spx, bx+min_edge, bx+bw-min_edge)
+  if point_up then
+    -- 말풍선이 아래 → 삼각형이 위(화자)를 가리킴, 밑변은 말풍선 윗변
+    local ax,ay = tx-3, by
+    local bx2,by2 = tx+3, by
+    trifill(ax,ay, bx2,by2, tx,tip_y, BG)
+    line(ax,ay, tx,tip_y, FG); line(bx2,by2, tx,tip_y, FG)
+    line(ax,ay, bx2,by2, BG)   -- 밑변(말풍선 테두리와 겹침) 지움
+  else
+    -- 말풍선이 위 → 삼각형이 아래(화자)를 가리킴, 밑변은 말풍선 아랫변
+    local ay = by + bh
+    local ax,a1y = tx-3, ay
+    local bx2,b1y = tx+3, ay
+    trifill(ax,a1y, bx2,b1y, tx,tip_y, BG)
+    line(ax,a1y, tx,tip_y, FG); line(bx2,b1y, tx,tip_y, FG)
+    line(ax,a1y, bx2,b1y, BG)
+  end
+
+  -- 글자 (사각형 안쪽, 여백 PAD_TEXT)
+  print(text, bx+PAD_TEXT, by+PAD_TEXT, FG)
+end
+
 -- ─── HUD ──────────────────────────────────────────────────────
 function draw_hud()
   local l=lander
   local ty=terrain_y_at(l.x)
   local alt=math.max(0,math.floor(ty-l.y))
   local spd=math.sqrt(l.vx^2+l.vy^2)
+  -- 지형 기준 왼쪽으로 이동(vx<0) 중이면 속도를 음수로 표시
+  if l.vx < 0 then spd = -spd end
 
   rectfill(0,0,W,18,BG); line(0,18,W,18,FG)
 
@@ -1041,13 +1128,17 @@ function draw_hud()
   print("HI:"..high_score,                        360,  5,FG)
   print("LV:"..level,                             445,  5,FG)
 
-  -- 연료 바: "FUEL" 글자 오른쪽에 게이지
+  -- 연료: EASY(무제한)는 텍스트, 그 외는 게이지
   print("FUEL", 2, 22, FG)
-  local gx = 24                       -- 게이지 시작 x (FUEL 글자 뒤)
-  local gw = 110                      -- 게이지 전체 폭
-  local fw = math.floor((l.fuel/FUEL_MAX)*gw)
-  rect(gx, 22, gx+gw, 28, FG)
-  if fw > 0 then rectfill(gx+1, 23, gx+fw, 27, FG) end
+  local gx = 24
+  if l.fuel < 0 then
+    print("UNLIMITED", gx, 22, FG)      -- EASY: 게이지 없이 텍스트만
+  else
+    local gw = 110                      -- 게이지 전체 폭
+    rect(gx, 22, gx+gw, 28, FG)
+    local fw = math.floor((l.fuel/FUEL_MAX)*gw)
+    if fw > 0 then rectfill(gx+1, 23, gx+fw, 27, FG) end
+  end
 end
 
 -- ─── 별 그리기 ────────────────────────────────────────────────
@@ -1240,6 +1331,8 @@ function update_intro()
     csm.vx = TITLE_SCROLL * 1.3 * 1.15   -- 사령선은 계속 더 빠르게 전진
     l.vx = TITLE_SCROLL * 1.3 * 0.7      -- 착륙선은 속도 살짝 감소
     -- 각도는 도킹 시 자세(90도) 그대로 유지 — 플레이어가 직접 세움
+    -- 분리 직후 명대사 말풍선 3초(180프레임)
+    bubble = { text="THE EAGLE HAS WINGS.", t=180 }
     game_state = "play"
   end
 
@@ -1250,17 +1343,21 @@ function _init()
   math.randomseed(math.floor(time()*1000)%2147483621)
   stars_list=gen_stars()
   score=0; high_score=0; level=1; flame_t=0
+  goto_title()
+end
+
+-- 타이틀 화면으로 전환 (지형 새로 생성 + 타이틀 카메라 셋업)
+function goto_title()
   trail_list={}; particles_list={}; dust_list={}; msg_timer=0
   shake_t=0
   csm=nil
   star_scroll=0
+  bubble=nil
   game_state="title"
   terrain_pts,pads=gen_terrain(1)
   lander=new_lander()
   -- 타이틀 카메라: 지형을 화면 아래쪽에 두어 로고와 덜 겹치게
   cam_x = WORLD_W/2
-  -- cam_y가 화면중심(H/2)에 매핑됨. 지형 표면을 화면 하단(약 75%)에 두려면
-  -- 표면보다 위쪽(작은 y)에 카메라를 둔다.
   cam_zoom = 0.7
   cam_y = terrain_y_at(cam_x) - (H*0.25)/cam_zoom
 end
@@ -1269,6 +1366,10 @@ end
 function _update()
   flame_t=flame_t+1
   if shake_t and shake_t>0 then shake_t=shake_t-1 end
+  if bubble and bubble.t>0 then
+    bubble.t = bubble.t - 1
+    if bubble.t<=0 then bubble = nil end
+  end
   -- Shift 누를 때마다 디버그 표시 토글
   if keyp("shift") then DEBUG_MODE = not DEBUG_MODE end
 
@@ -1304,6 +1405,9 @@ function _update()
     -- 지형을 왼쪽으로 흘려보냄(보이지 않는 비행체가 오른쪽으로 가는 것처럼)
     cam_x = (cam_x + TITLE_SCROLL) % WORLD_W
     star_scroll = (star_scroll or 0) + TITLE_SCROLL
+    -- 좌우 키로 난이도 선택
+    if btnp(0) then difficulty = math.max(0, difficulty-1) end
+    if btnp(1) then difficulty = math.min(2, difficulty+1) end
     if btnp(4) or btnp(5) then
       score=0; level=1
       start_intro()
@@ -1318,21 +1422,20 @@ function _update()
 
   if game_state=="crashed" then
     msg_timer=msg_timer-1
-    if msg_timer<=0 and (btnp(4) or btnp(5)) then
-      start_level(level)
+    if msg_timer<=0 then
+      if btnp(4) then start_level(level)       -- Z: 재시도
+      elseif btnp(5) then goto_title() end     -- X: 타이틀로
     end
     update_camera(); return
   end
 
   if game_state=="landed" or game_state=="win" then
-    -- 자동 진행 대신 Z키 대기 (메시지 표시 후 잠깐 입력 잠금)
     msg_timer=msg_timer-1
-    if msg_timer<=0 and (btnp(4) or btnp(5)) then
-      if game_state=="landed" then
-        start_level(level+1)
-      else
-        game_state="title"; terrain_pts,pads=gen_terrain(1); lander=new_lander()
-      end
+    if msg_timer<=0 then
+      if btnp(4) then                          -- Z: 다음 / (win이면 타이틀)
+        if game_state=="landed" then start_level(level+1)
+        else goto_title() end
+      elseif btnp(5) then goto_title() end     -- X: 타이틀로
     end
     update_camera(); return
   end
@@ -1345,10 +1448,11 @@ function _update()
     if btn(0) then l.ang=l.ang-ROT_SPD end
     if btn(1) then l.ang=l.ang+ROT_SPD end
     l.ang=l.ang%360
-    if btn(2) and l.fuel>0 then
+    -- fuel<0 이면 무제한(EASY)
+    if btn(2) and l.fuel~=0 then
       local r=deg2rad(l.ang)
       l.vx=l.vx+math.sin(r)*THRUST; l.vy=l.vy-math.cos(r)*THRUST
-      l.fuel=l.fuel-1
+      if l.fuel>0 then l.fuel=l.fuel-1 end
       thrust_dust(l)   -- 저고도에서 지면 먼지
     end
   end
@@ -1403,6 +1507,8 @@ function _update()
       sc.ang_b  = 0
       sc.spd_b  = 0
       sc.ctr_b  = 0
+      sc.fuel_b = 0
+      sc.diff_b = 0
 
       if l.score_both then
         sc.base = 100 * l.pad_mult
@@ -1432,9 +1538,19 @@ function _update()
       else
         if l.score_ang <= 5 then sc.ang_b = 50 end
         if l.score_spd <= SOFT_SPD then sc.spd_b = 50 end
+
+        -- 연료 가산점: 남은 비율 90%↑ +100, 10%↓ +0 (선형). EASY는 없음.
+        if l.fuel >= 0 and l.fuel0 and l.fuel0 > 0 then
+          local ratio = l.fuel / l.fuel0
+          local ft = clamp((ratio - 0.10) / (0.90 - 0.10), 0, 1)
+          sc.fuel_b = math.floor(100 * ft)
+        end
+
+        -- 난이도 가산점: HARD(2) +100
+        if difficulty == 2 then sc.diff_b = 100 end
       end
 
-      sc.total = sc.base + sc.ang_b + sc.spd_b + sc.ctr_b
+      sc.total = sc.base + sc.ang_b + sc.spd_b + sc.ctr_b + sc.fuel_b + sc.diff_b
       score = score + sc.total
       if score > high_score then high_score = score end
 
@@ -1563,18 +1679,36 @@ function _draw()
       outline_print(s, math.floor((W-w)/2), y)
     end
     cprint("A Picotron Adventure  "..VERSION, by1)
-    cprint("<> Rotate    ^ Thrust",           by1+16)
-    cprint("Land on the lit pads!",           by1+28)
+    cprint("\139 \145 Rotate    \148 Thrust",   by1+16)
+
+    -- [Z] START 와 같은 타이밍의 깜빡임
+    local blink_on = (math.floor(flame_t/20)%2==0)
+
+    -- 난이도 선택: EASY [NORMAL] HARD
+    -- 선택 항목의 대괄호는 [Z] START와 같은 타이밍으로 깜빡임
+    do
+      local parts = {}
+      for i=0,2 do
+        local nm = DIFFICULTY_NAMES[i+1]
+        if i==difficulty then
+          parts[#parts+1] = blink_on and ("["..nm.."]") or (" "..nm.." ")
+        else
+          parts[#parts+1] = " "..nm.." "
+        end
+      end
+      local s = parts[1].." "..parts[2].." "..parts[3]
+      cprint(s, by1+34)
+    end
 
     -- [Z] TO START : 깜빡임
-    if math.floor(flame_t/20)%2==0 then
+    if blink_on then
       local s="[ Z ]  TO  START"
       local w=#s*4
-      outline_print(s, math.floor((W-w)/2), by1+48)
+      outline_print(s, math.floor((W-w)/2), by1+58)
     end
 
     if high_score>0 then
-      cprint("BEST: "..high_score, by1+64)
+      cprint("BEST: "..high_score, by1+74)
     end
 
     -- 빌드 시각 (하단)
@@ -1593,10 +1727,16 @@ function _draw()
   if csm then draw_csm(csm) end
 
   if lander.alive then
-    if btn(2) and lander.fuel>0 and game_state=="play" then draw_flame(lander) end
+    if btn(2) and lander.fuel~=0 and game_state=="play" then draw_flame(lander) end
     draw_lander(lander)
   elseif game_state=="landed" then
     draw_lander(lander)
+  end
+
+  -- 말풍선 (착륙선을 화자로; 착륙선 위치 따라 같이 움직임)
+  if bubble then
+    local spx, spy = world_to_screen(lander.x, lander.y)
+    draw_speech_bubble(bubble.text, math.floor(spx), math.floor(spy))
   end
 
   -- 진동 복원 (이후 UI는 흔들리지 않게)
@@ -1626,6 +1766,14 @@ function _draw()
       end
       rows[#rows+1] = {"Angle <5d",    "+"..sc.ang_b}
       rows[#rows+1] = {"Soft landing", "+"..sc.spd_b}
+      -- 연료 가산점: EASY(무제한)가 아닐 때만 표시
+      if lander.fuel >= 0 then
+        rows[#rows+1] = {"Fuel saved", "+"..sc.fuel_b}
+      end
+      -- 난이도 가산점: HARD일 때만 표시
+      if sc.diff_b > 0 then
+        rows[#rows+1] = {"Hard mode", "+"..sc.diff_b}
+      end
     end
 
     -- 박스 높이: 제목 + 줄들 + 구분선 + 총점 + 넉넉한 [Z] 여백
@@ -1652,17 +1800,22 @@ function _draw()
     row("Total Score", "+"..sc.total, y); y = y + 16
 
     if blink then
-      local nxt = (game_state=="win") and "[ Z ] Title" or "[ Z ] Next"
+      local nxt
+      if game_state=="win" then
+        nxt = "[ Z ] / [ X ]  Title"
+      else
+        nxt = "[ Z ] Next   [ X ] Title"
+      end
       local nw = #nxt*4
       print(nxt, mx+(boxw-nw)/2, y, FG)
     end
   elseif game_state=="crashed" then
-    local boxw=140
+    local boxw=160
     local mx=math.floor(W/2-boxw/2); local my=74
     rectfill(mx,my,mx+boxw,my+52,BG); rect(mx,my,mx+boxw,my+52,FG)
     print("CRASH!",      mx+10, my+8,  FG)
     print("SCORE  -100", mx+10, my+24, FG)
-    if blink then print("[ Z ] Retry", mx+10, my+40, FG) end
+    if blink then print("[ Z ] Retry   [ X ] Title", mx+10, my+40, FG) end
   end
 
   if game_state=="play" and lander.alive and lander.y<20 then
