@@ -4,8 +4,8 @@
 -- ╚══════════════════════════════════╝
 
 -- 버전 정보
-VERSION    = "v0.22.0"
-BUILD_TIME = "2026-06-18 (build 42)"
+VERSION    = "v0.24.2"
+BUILD_TIME = "2026-06-19 (build 46)"
 
 -- ─── 상수 ─────────────────────────────────────────────────────
 W         = 480
@@ -50,6 +50,26 @@ ZOOM_MAX  = 1.8
 -- 완전 흑백: 검정=0, 흰색=7 딱 2가지만
 BG  = 0   -- 배경 / 채우기
 FG  = 7   -- 전경 / 선
+
+-- ─── 사운드 ───────────────────────────────────────────────────
+-- SFX 슬롯: 0=추력 1=UI표시 2=키피드백 3=착륙성공 4=폭발
+SFX_THRUST, SFX_UI, SFX_KEY, SFX_LAND, SFX_BOOM = 0, 1, 2, 3, 4
+THRUST_CH = 3   -- 추력 전용 채널 (다른 효과음과 안 겹치게)
+thrust_playing = false
+
+-- 추력음: 누르는 동안 끊김 없이 유지. 재생 중이 아닐 때만 시작.
+function snd_thrust_start()
+  if not thrust_playing then
+    sfx(SFX_THRUST, THRUST_CH)
+    thrust_playing = true
+  end
+end
+function snd_thrust_stop()
+  if thrust_playing then
+    sfx(-1, THRUST_CH)   -- 해당 채널 정지
+    thrust_playing = false
+  end
+end
 
 -- ─── 유틸 ─────────────────────────────────────────────────────
 function lerp(a, b, t)       return a + (b-a)*t end
@@ -160,9 +180,12 @@ function gen_terrain(lvl)
   while x < WORLD_W do
     if nxt and math.abs(x-nxt)<step/2 then
       local mult = mults[pi]
-      local pw = (mult==3) and math.floor(PAD_W*0.6)
-              or (mult==2) and math.floor(PAD_W*0.8)
-              or PAD_W
+      -- 패드 폭 = 양 발 폭(LANDER_FOOT_X*2) × 배수
+      --   x1=1.8배(가장 넓고 쉬움), x2=1.5배, x3=1.2배(가장 좁고 어려움)
+      local foot_span = LANDER_FOOT_X * 2
+      local pw = (mult==3) and math.floor(foot_span*1.2)
+              or (mult==2) and math.floor(foot_span*1.5)
+              or math.floor(foot_span*1.8)
 
       -- 위로 솟는 벽을 만드는 헬퍼: 패드 높이에서 시작해 위로(y 감소) 솟음
       local depth = 4
@@ -455,6 +478,8 @@ end
 -- 폭발: 착륙선 몸통을 완전히 뒤덮은 채로 시작 → 사방으로 흩어짐
 -- 먼지와 같은 형식(속 검정 + 흰 테두리 원, 점으로 축소), 달 중력 적용
 function explode(l)
+  snd_thrust_stop()       -- 추력음이 울리고 있으면 정지
+  sfx(SFX_BOOM)           -- 폭발음
   local cs = math.cos(deg2rad(l.ang))
   local sn = math.sin(deg2rad(l.ang))
   -- 몸통 box 영역(BODY_BOX_L..R, T..B)을 격자로 촘촘히 채워 시작
@@ -596,27 +621,28 @@ lander_lod = 0
 function update_lod(z)
   local cur = lander_lod
   -- 내려가는(멀어지는) 경계와 올라가는(가까워지는) 경계를 분리
+  -- LOD0(풀디테일)이 더 자주 보이도록 1→0 경계를 낮춤
   if cur == 0 then
-    if z < 0.62 then cur = 1 end
+    if z < 0.50 then cur = 1 end
   elseif cur == 1 then
-    if z < 0.42 then cur = 2
-    elseif z > 0.78 then cur = 0 end
+    if z < 0.38 then cur = 2
+    elseif z > 0.58 then cur = 0 end
   else -- cur == 2
-    if z > 0.50 then cur = 1 end
+    if z > 0.46 then cur = 1 end
   end
   lander_lod = cur
   return cur
 end
 
--- 발판 로컬: rp(±23, 20) → 물리 오프셋: (±11.5, 10)
-LANDER_FOOT_X = 12
-LANDER_FOOT_Y = 10
+-- 발판 로컬: rp(±20, 16) → 물리 오프셋: (±10, 8) (발 70% 축소 반영)
+LANDER_FOOT_X = 10
+LANDER_FOOT_Y = 8
 
 -- 몸통 충돌 box (발 제외). 뾰족한 지형 관통 감지용으로 아래쪽 넉넉히
 BODY_BOX_L = -5
 BODY_BOX_R =  5
 BODY_BOX_T = -5
-BODY_BOX_B =  8   -- 아래쪽 확장 (발끝 LANDER_FOOT_Y=10 직전까지)
+BODY_BOX_B =  6   -- 아래쪽 (발끝 LANDER_FOOT_Y=8 직전까지)
 
 function draw_lander(l)
   local r=deg2rad(l.ang)
@@ -645,16 +671,16 @@ function draw_lander(l)
       trifill(d1x,d1y,d2x,d2y,d3x,d3y,BG)
       line(d1x,d1y,d2x,d2y,FG); line(d2x,d2y,d3x,d3y,FG); line(d3x,d3y,d1x,d1y,FG)
     end
-    -- 왼쪽 다리
+    -- 왼쪽 다리 (70% 길이, 발판 60%)
     do
-      local ax,ay=rp(-10,8); local bx,by=rp(-20,18)
-      local cx,cy=rp(-24,18); local dx,dy=rp(-15,18)
+      local ax,ay=rp(-10,8); local bx,by=rp(-17,16)
+      local cx,cy=rp(-20,16); local dx,dy=rp(-14,16)
       line(ax,ay,bx,by,FG); line(cx,cy,dx,dy,FG)
     end
     -- 오른쪽 다리
     do
-      local ax,ay=rp(10,8); local bx,by=rp(20,18)
-      local cx,cy=rp(15,18); local dx,dy=rp(24,18)
+      local ax,ay=rp(10,8); local bx,by=rp(17,16)
+      local cx,cy=rp(14,16); local dx,dy=rp(20,16)
       line(ax,ay,bx,by,FG); line(cx,cy,dx,dy,FG)
     end
     return
@@ -662,19 +688,20 @@ function draw_lander(l)
 
   -- ── LOD0: 풀 디테일 ───────────────────────────────────────
 
-  -- 다리 (동체보다 먼저)
+  -- 다리 (동체보다 먼저). 발 길이 70%, 발판 가로선 60%로 축소.
+  -- 부착점(±12,8) → 발끝(±20,16) (원래 ±24,20에서 70%)
   do
-    local ax,ay=rp(-12,8); local bx,by=rp(-24,20)
-    local cx,cy=rp(-28,20); local dx,dy=rp(-18,20)
+    local ax,ay=rp(-12,8); local bx,by=rp(-20,16)
+    local cx,cy=rp(-23,16); local dx,dy=rp(-17,16)  -- 발판 가로선(폭 6, 원래 10의 60%)
     line(ax,ay,bx,by,FG); line(cx,cy,dx,dy,FG)
-    local sx,sy=rp(-6,2); local ex,ey=rp(-18,14)
+    local sx,sy=rp(-6,2); local ex,ey=rp(-15,12)
     line(sx,sy,ex,ey,FG)
   end
   do
-    local ax,ay=rp(12,8); local bx,by=rp(24,20)
-    local cx,cy=rp(18,20); local dx,dy=rp(28,20)
+    local ax,ay=rp(12,8); local bx,by=rp(20,16)
+    local cx,cy=rp(17,16); local dx,dy=rp(23,16)
     line(ax,ay,bx,by,FG); line(cx,cy,dx,dy,FG)
-    local sx,sy=rp(6,2); local ex,ey=rp(18,14)
+    local sx,sy=rp(6,2); local ex,ey=rp(15,12)
     line(sx,sy,ex,ey,FG)
   end
   -- 하강단
@@ -1085,22 +1112,25 @@ function draw_speech_bubble(text, spx, spy)
   rect(bx, by, bx+bw, by+bh, FG)
 
   -- 삼각형 꼬리 (검정 채움 + 흰 테두리). 꼭짓점은 화자 쪽(tip_y).
+  -- 밑변을 사각형 테두리에 1px 겹쳐 떨어져 보이지 않게 한다.
   local tx = clamp(spx, bx+min_edge, bx+bw-min_edge)
   if point_up then
-    -- 말풍선이 아래 → 삼각형이 위(화자)를 가리킴, 밑변은 말풍선 윗변
-    local ax,ay = tx-3, by
-    local bx2,by2 = tx+3, by
+    -- 말풍선이 아래 → 삼각형이 위(화자)를 가리킴
+    local base_y = by + 1            -- 사각형 윗변보다 1px 안쪽
+    local ax,ay = tx-3, base_y
+    local bx2,by2 = tx+3, base_y
     trifill(ax,ay, bx2,by2, tx,tip_y, BG)
     line(ax,ay, tx,tip_y, FG); line(bx2,by2, tx,tip_y, FG)
-    line(ax,ay, bx2,by2, BG)   -- 밑변(말풍선 테두리와 겹침) 지움
+    -- 밑변 구간의 사각형 테두리를 지워 내부가 트이게(연결)
+    line(ax+1, by, bx2-1, by, BG)
   else
-    -- 말풍선이 위 → 삼각형이 아래(화자)를 가리킴, 밑변은 말풍선 아랫변
-    local ay = by + bh
-    local ax,a1y = tx-3, ay
-    local bx2,b1y = tx+3, ay
+    -- 말풍선이 위 → 삼각형이 아래(화자)를 가리킴
+    local base_y = by + bh - 1       -- 사각형 아랫변보다 1px 안쪽
+    local ax,a1y = tx-3, base_y
+    local bx2,b1y = tx+3, base_y
     trifill(ax,a1y, bx2,b1y, tx,tip_y, BG)
     line(ax,a1y, tx,tip_y, FG); line(bx2,b1y, tx,tip_y, FG)
-    line(ax,a1y, bx2,b1y, BG)
+    line(ax+1, by+bh, bx2-1, by+bh, BG)
   end
 
   -- 글자 (사각형 안쪽, 여백 PAD_TEXT)
@@ -1264,6 +1294,7 @@ function start_level(lvl)
   trail_list={}; particles_list={}; dust_list={}; msg_timer=0
   shake_t=0
   csm=nil
+  snd_thrust_stop()
 
   -- 게임 시작 초반과 동일하게: 오른쪽으로 비행하던 속도/각도로 시작
   local sx = WORLD_W/2
@@ -1353,6 +1384,7 @@ function goto_title()
   csm=nil
   star_scroll=0
   bubble=nil
+  snd_thrust_stop()
   game_state="title"
   terrain_pts,pads=gen_terrain(1)
   lander=new_lander()
@@ -1409,6 +1441,7 @@ function _update()
     if btnp(0) then difficulty = math.max(0, difficulty-1) end
     if btnp(1) then difficulty = math.min(2, difficulty+1) end
     if btnp(4) or btnp(5) then
+      sfx(SFX_KEY)
       score=0; level=1
       start_intro()
     end
@@ -1423,8 +1456,8 @@ function _update()
   if game_state=="crashed" then
     msg_timer=msg_timer-1
     if msg_timer<=0 then
-      if btnp(4) then start_level(level)       -- Z: 재시도
-      elseif btnp(5) then goto_title() end     -- X: 타이틀로
+      if btnp(4) then sfx(SFX_KEY); start_level(level)     -- Z: 재시도
+      elseif btnp(5) then sfx(SFX_KEY); goto_title() end   -- X: 타이틀로
     end
     update_camera(); return
   end
@@ -1433,9 +1466,10 @@ function _update()
     msg_timer=msg_timer-1
     if msg_timer<=0 then
       if btnp(4) then                          -- Z: 다음 / (win이면 타이틀)
+        sfx(SFX_KEY)
         if game_state=="landed" then start_level(level+1)
         else goto_title() end
-      elseif btnp(5) then goto_title() end     -- X: 타이틀로
+      elseif btnp(5) then sfx(SFX_KEY); goto_title() end   -- X: 타이틀로
     end
     update_camera(); return
   end
@@ -1454,7 +1488,12 @@ function _update()
       l.vx=l.vx+math.sin(r)*THRUST; l.vy=l.vy-math.cos(r)*THRUST
       if l.fuel>0 then l.fuel=l.fuel-1 end
       thrust_dust(l)   -- 저고도에서 지면 먼지
+      snd_thrust_start()
+    else
+      snd_thrust_stop()
     end
+  else
+    snd_thrust_stop()
   end
 
   -- ── settling 중: 물리 대신 강제 정착 처리 ──────────────────
@@ -1555,6 +1594,8 @@ function _update()
       if score > high_score then high_score = score end
 
       msg_timer = 90
+      snd_thrust_stop()
+      sfx(SFX_UI)          -- 결과창(UI 창) 표시음
       game_state = (level>=8) and "win" or "landed"
     end
     return
@@ -1609,6 +1650,8 @@ function _update()
   end
 
   -- 안전 → settling 시작 (이후 위 블록에서 강제 정착 처리)
+  snd_thrust_stop()
+  sfx(SFX_LAND)        -- 접지 성공음 (결과창은 정착 완료 후 등장)
   l.settling      = true
   l.settle_t      = 0
   l.landed_on_pad = (result == "pad")
